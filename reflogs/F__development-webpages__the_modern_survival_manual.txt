@@ -1,0 +1,1 @@
+0000000000000000000000000000000000000000 15dbe785033d66c830cfa995c4e334aa4567f11c B0LK13 <155284716+B0LK13@users.noreply.github.com> 1758033359 +0200	clone: from https://huggingface.co/spaces/B0LK13187/the-modern-survival-manual

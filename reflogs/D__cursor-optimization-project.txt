@@ -1,0 +1,3 @@
+0000000000000000000000000000000000000000 2392a7464b7ce023426610b02c7e97e4335ca54b B0LK13 <wesley@bolk.online> 1783362060 +0200	commit (initial): Initialize Cursor NextGen autonomous development system
+2392a7464b7ce023426610b02c7e97e4335ca54b 2ebfe491d50ffa9cc39caeaec16883085add6ac1 B0LK13 <wesley@bolk.online> 1783365294 +0200	commit: Loop 16: deploy tooling and HelloVerify pilot
+2ebfe491d50ffa9cc39caeaec16883085add6ac1 3ac99c3e4225856bd7e61382025c5c6602aba2d5 B0LK13 <wesley@bolk.online> 1783369440 +0200	commit: Document project-llm-wiki pilot deploy (Loop 17, v1.4.0)

@@ -1,0 +1,2 @@
+0000000000000000000000000000000000000000 5012a49cfa988712f82d0acb0bfb84e4684b67d7 Wesley Bolk <wesley@bolk.dev> 1783242017 +0200	commit (initial): autoresearch-loop v1.0.0: evidence-driven autonomous development loop harness
+5012a49cfa988712f82d0acb0bfb84e4684b67d7 dc3f18e066181bfdc0a6bea4e037bd0f2dc01cc5 Wesley Bolk <wesley@bolk.dev> 1783244910 +0200	commit: fix: capture gate output via file handle, not pipe (Gradle daemon holds pipes open)

@@ -1,0 +1,1 @@
+0000000000000000000000000000000000000000 d9f7248e3ef2ff963f284efa5ac116d526a6e3c3 Wesley Bolk <wesley@bolk.dev> 1783425087 +0200	clone: from https://github.com/B0LK13/template-android-app.git

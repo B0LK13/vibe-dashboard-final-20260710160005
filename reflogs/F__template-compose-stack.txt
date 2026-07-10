@@ -1,0 +1,1 @@
+0000000000000000000000000000000000000000 275ad2599bed5302a9a1f5a7efa4acd8ea9ecb39 B0LK13 <wesley@bolk.online> 1783172423 +0200	commit (initial): feat: template compose stack with loopback binds

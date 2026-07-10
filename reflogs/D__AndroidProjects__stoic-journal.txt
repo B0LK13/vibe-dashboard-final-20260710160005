@@ -1,0 +1,1 @@
+0000000000000000000000000000000000000000 ccb9420175c75815d1795211a585336725dd1cec Wesley Bolk <wesley@bolk.dev> 1783424858 +0200	clone: from https://github.com/B0LK13/stoic-journal.git

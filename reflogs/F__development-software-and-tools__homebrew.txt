@@ -1,0 +1,2 @@
+0000000000000000000000000000000000000000 7cc11daaba9da8e2bb825470731ae320a8c96042 gebruiker <gebruiker@CyberCommandCenter.localdomain> 1776216548 +0200	reset: moving to origin/HEAD
+7cc11daaba9da8e2bb825470731ae320a8c96042 299ab19496df6fc76e8356c0b87100ff91ef827e gebruiker <gebruiker@CyberCommandCenter.localdomain> 1776216577 +0200	checkout: moving from master to stable

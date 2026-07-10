@@ -1,0 +1,5 @@
+0000000000000000000000000000000000000000 0938dfac58704fe32283f3337ae55cec631a486e Wesley Bolk <wesley@bolk.dev> 1779697263 +0200	commit (initial): feat: multi-mailbox manager — all 5 accounts unified
+0938dfac58704fe32283f3337ae55cec631a486e e1661f7020726ecaba20f96009486fbf3c493809 Wesley Bolk <wesley@bolk.dev> 1779698920 +0200	commit: fix: resolve REPO_DIR through symlink in multi-mailbox.sh
+e1661f7020726ecaba20f96009486fbf3c493809 aff80205a678cd453de14582aad0629280016d8f Wesley Bolk <wesley@bolk.dev> 1779699504 +0200	commit: fix: local keyword used outside functions in bolk-online-mail-manager.sh
+aff80205a678cd453de14582aad0629280016d8f e88ef1a32b9a43ca30904badacaa5d3a021d651c Wesley Bolk <wesley@bolk.dev> 1779711108 +0200	commit: fix: correct bolk.online account email to developer@bolk.online
+e88ef1a32b9a43ca30904badacaa5d3a021d651c 14addcadf7682f70719ed771860f09586b32bd80 Wesley Bolk <wesley@bolk.dev> 1779711316 +0200	commit: fix: ensure_folder stdout pollution and URL encoding bug in apply-rules

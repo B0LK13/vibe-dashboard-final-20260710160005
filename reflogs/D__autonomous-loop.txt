@@ -1,0 +1,7 @@
+0000000000000000000000000000000000000000 26d6b8f834f832119460eaa4232695344d7813a7 Autonomous Loop <loop@autonomous.local> 1783253602 +0200	commit (initial): v0.1.0-rc1 baseline: autonomous development loop MVP
+26d6b8f834f832119460eaa4232695344d7813a7 26d6b8f834f832119460eaa4232695344d7813a7 Autonomous Loop <loop@autonomous.local> 1783256782 +0200	reset: moving to HEAD
+26d6b8f834f832119460eaa4232695344d7813a7 26d6b8f834f832119460eaa4232695344d7813a7 Autonomous Loop <loop@autonomous.local> 1783256810 +0200	reset: moving to HEAD
+26d6b8f834f832119460eaa4232695344d7813a7 26d6b8f834f832119460eaa4232695344d7813a7 Autonomous Loop <loop@autonomous.local> 1783260397 +0200	reset: moving to HEAD
+26d6b8f834f832119460eaa4232695344d7813a7 26d6b8f834f832119460eaa4232695344d7813a7 Autonomous Loop <loop@autonomous.local> 1783260401 +0200	reset: moving to HEAD
+26d6b8f834f832119460eaa4232695344d7813a7 864bfe6f902a11d2206f12fb8b255920186a5e8d Autonomous Loop <loop@autonomous.local> 1783258401 +0200	commit: Release candidate v0.1.0-rc1
+864bfe6f902a11d2206f12fb8b255920186a5e8d 54f69eca68979e17bbae3aa9625fbd6e0cf1b096 Autonomous Loop <loop@autonomous.local> 1783258428 +0200	commit: Add v0.1.0-rc1 release candidate report

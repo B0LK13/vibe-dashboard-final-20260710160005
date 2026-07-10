@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Coders — Project Performance Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --panel: #161b22; --panel2: #1c2129; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+  --green: #3fb950; --amber: #d29922; --orange: #f0883e; --red: #f85149;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; }
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+header h1 { font-size: 22px; font-weight: 600; }
+header .sub { color: var(--muted); font-size: 13px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.stat .v { font-size: 26px; font-weight: 700; }
+.stat .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.stat.green .v { color: var(--green); } .stat.amber .v { color: var(--amber); }
+.stat.orange .v { color: var(--orange); } .stat.red .v { color: var(--red); }
+.filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+.filters select, .filters input { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.filters input { flex: 1; min-width: 180px; }
+.charts { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+@media (max-width: 1000px) { .charts { grid-template-columns: 1fr; } }
+.chartbox { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.chartbox h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+.chartbox canvas { max-height: 210px; }
+h2 { font-size: 15px; margin: 18px 0 10px; color: var(--muted); font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: border-color .15s; }
+.card:hover { border-color: var(--accent); }
+.card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.card .name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.b-healthy { background: #12261e; color: var(--green); border: 1px solid var(--green); }
+.b-watch { background: #2a2312; color: var(--amber); border: 1px solid var(--amber); }
+.b-atrisk { background: #2b1d10; color: var(--orange); border: 1px solid var(--orange); }
+.b-dormant { background: #2b1214; color: var(--red); border: 1px solid var(--red); }
+.card .meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.bar { height: 5px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.bar i { display: block; height: 100%; border-radius: 3px; }
+.reasons { font-size: 12px; color: var(--muted); line-height: 1.5; display: none; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
+.card.open .reasons { display: block; }
+.reasons .warn { color: var(--orange); } .reasons .pos { color: var(--green); }
+.kvs { display: flex; gap: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.kvs b { color: var(--text); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-size: 12px; cursor: pointer; user-select: none; background: var(--panel2); position: sticky; top: 0; }
+tr:hover td { background: var(--panel2); }
+td.num, th.num { text-align: right; }
+.tablewrap { max-height: 480px; overflow: auto; border-radius: 10px; border: 1px solid var(--border); }
+.score { font-weight: 700; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; text-align: center; }
+.empty { text-align: center; color: var(--muted); padding: 40px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🚀 Vibe Coders — Project Performance Dashboard</h1>
+    <span class="sub" id="scanInfo"></span>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="filters">
+    <input id="search" type="search" placeholder="Search projects…">
+    <select id="fDrive"><option value="">All drives</option></select>
+    <select id="fCategory"><option value="">All categories</option></select>
+    <select id="fTech"><option value="">All tech</option></select>
+    <select id="fHealth">
+      <option value="">All health</option>
+      <option>Healthy</option><option>Watch</option><option>At Risk</option><option>Dormant</option>
+    </select>
+    <select id="fSort">
+      <option value="score-asc">Needs attention first</option>
+      <option value="score-desc">Healthiest first</option>
+      <option value="recent">Recently active</option>
+      <option value="commits">Most commits (30d)</option>
+      <option value="name">Name A–Z</option>
+    </select>
+  </div>
+
+  <div class="charts">
+    <div class="chartbox"><h3>Activity — commits in last 30 days (top 15)</h3><canvas id="cActivity"></canvas></div>
+    <div class="chartbox"><h3>Health distribution</h3><canvas id="cHealth"></canvas></div>
+    <div class="chartbox"><h3>Tech mix</h3><canvas id="cTech"></canvas></div>
+  </div>
+
+  <h2 id="gridTitle">Projects</h2>
+  <div class="grid" id="grid"></div>
+
+  <h2>All projects</h2>
+  <div class="tablewrap">
+  <table id="table">
+    <thead><tr>
+      <th data-k="name">Project</th><th data-k="category">Category</th><th data-k="tech">Tech</th>
+      <th class="num" data-k="score">Health</th><th class="num" data-k="commits30d">Commits 30d</th>
+      <th class="num" data-k="totalCommits">Local commits</th><th class="num" data-k="contributors">Contributors</th>
+      <th data-k="branch">Branch</th><th data-k="lastActivity">Last activity</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script id="scan-data" type="application/json">[{"name":"ai-fintech","path":"D:\\ai-fintech","drive":"D","category":"D-root","hasGit":true,"branch":"main","totalCommits":1,"lastCommitDate":"2026-07-09","commits30d":1,"commits90d":1,"contributors":1,"lastModified":"2026-07-09","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"black-agency-os-android","path":"D:\\AndroidProjects\\black-agency-os-android","drive":"D","category":"AndroidProjects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-07-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-07-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"daily-trendscape","path":"D:\\AndroidProjects\\daily-trendscape","drive":"D","category":"AndroidProjects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-07-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-07-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"project-pulse-android","path":"D:\\AndroidProjects\\project-pulse-android","drive":"D","category":"AndroidProjects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-07-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-07-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"stoic-journal","path":"D:\\AndroidProjects\\stoic-journal","drive":"D","category":"AndroidProjects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-07-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-07-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"template-android-app","path":"D:\\AndroidProjects\\template-android-app","drive":"D","category":"AndroidProjects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-07-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-07-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"vibe-dashboard-android","path":"D:\\AndroidProjects\\vibe-dashboard-android","drive":"D","category":"AndroidProjects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-07-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-07-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"autonomous-loop","path":"D:\\autonomous-loop","drive":"D","category":"D-root","hasGit":true,"branch":"main","totalCommits":3,"lastCommitDate":"2026-07-05","commits30d":3,"commits90d":3,"contributors":1,"lastModified":"2026-07-05","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"cursor-optimization-project","path":"D:\\cursor-optimization-project","drive":"D","category":"D-root","hasGit":true,"branch":"main","totalCommits":3,"lastCommitDate":"2026-07-06","commits30d":3,"commits90d":3,"contributors":1,"lastModified":"2026-07-06","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"ados","path":"D:\\fable5\\ados","drive":"D","category":"fable5","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-07-06","uncommitted":null,"fileCount":5,"topExtensions":"","hasReadme":null},{"name":"black-agency-os","path":"D:\\fable5\\black-agency-os","drive":"D","category":"fable5","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-07-06","uncommitted":null,"fileCount":0,"topExtensions":"","hasReadme":null},{"name":"flutter","path":"D:\\flutter","drive":"D","category":"D-root","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-06-24","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-06-24","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"project-llm-wiki","path":"D:\\project-llm-wiki","drive":"D","category":"D-root","hasGit":true,"branch":"2026-07-09-f2xd","totalCommits":66,"lastCommitDate":"2026-07-09","commits30d":66,"commits90d":66,"contributors":2,"lastModified":"2026-07-09","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"B0LK13s-dark-factory","path":"F:\\development\\B0LK13s-dark-factory","drive":"F","category":"development","hasGit":true,"branch":"main","totalCommits":1,"lastCommitDate":"2026-07-09","commits30d":1,"commits90d":1,"contributors":1,"lastModified":"2026-07-09","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"obsidian-agent","path":"F:\\development\\bun\\obsidian-agent","drive":"F","category":"bun","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-02-07","uncommitted":null,"fileCount":2,"topExtensions":"","hasReadme":null},{"name":"development-agents","path":"F:\\development\\development-agents","drive":"F","category":"development","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-25","uncommitted":null,"fileCount":2,"topExtensions":"","hasReadme":null},{"name":"creator-kit-app","path":"F:\\development\\development-apps\\creator-kit-app","drive":"F","category":"development-apps","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-03","uncommitted":null,"fileCount":14,"topExtensions":"","hasReadme":null},{"name":"euro_subtracker","path":"F:\\development\\development-apps\\euro_subtracker","drive":"F","category":"development-apps","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-01-20","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-01-20","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"EuroSubTrackerPro","path":"F:\\development\\development-apps\\EuroSubTrackerPro","drive":"F","category":"development-apps","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2026-03-29","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-03-29","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"fast-api-app","path":"F:\\development\\development-apps\\fast-api-app","drive":"F","category":"development-apps","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-19","uncommitted":null,"fileCount":6,"topExtensions":"","hasReadme":null},{"name":"GithubAcces","path":"F:\\development\\development-authenticatie\\GithubAcces","drive":"F","category":"development-authenticatie","hasGit":true,"branch":"fleetmanager-mvp","totalCommits":1,"lastCommitDate":"2025-12-29","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-12-29","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"autoresearch-loop","path":"F:\\development\\development-automation\\autoresearch-loop","drive":"F","category":"development-automation","hasGit":true,"branch":"main","totalCommits":2,"lastCommitDate":"2026-07-05","commits30d":2,"commits90d":2,"contributors":1,"lastModified":"2026-07-05","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"cloud-dashboard","path":"F:\\development\\development-cloud\\cloud-dashboard","drive":"F","category":"development-cloud","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-04-26","uncommitted":null,"fileCount":21,"topExtensions":"","hasReadme":null},{"name":"multi-environment","path":"F:\\development\\development-cloud\\multi-environment","drive":"F","category":"development-cloud","hasGit":true,"branch":"main","totalCommits":5,"lastCommitDate":"2026-05-25","commits30d":0,"commits90d":5,"contributors":1,"lastModified":"2026-05-25","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"docker-scout-demo-service","path":"F:\\development\\development-demos\\docker-scout-demo-service","drive":"F","category":"development-demos","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-04-03","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-04-03","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"WebView2Demo","path":"F:\\development\\development-demos\\WebView2Demo","drive":"F","category":"development-demos","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-22","uncommitted":null,"fileCount":11,"topExtensions":"","hasReadme":null},{"name":"development-local","path":"F:\\development\\development-local","drive":"F","category":"development","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-07-04","uncommitted":null,"fileCount":7,"topExtensions":"","hasReadme":null},{"name":"ip-address-management-ipam","path":"F:\\development\\development-management\\ip-address-management-ipam","drive":"F","category":"development-management","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"development-notes","path":"F:\\development\\development-notes","drive":"F","category":"development","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-06-08","uncommitted":null,"fileCount":18,"topExtensions":"","hasReadme":null},{"name":"context-engineering-intro","path":"F:\\development\\development-projects\\context-engineering-intro","drive":"F","category":"development-projects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-08-07","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-08-07","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"hello-ai","path":"F:\\development\\development-projects\\hello-ai","drive":"F","category":"development-projects","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-03","uncommitted":null,"fileCount":12,"topExtensions":"","hasReadme":null},{"name":"inbox_zen","path":"F:\\development\\development-projects\\inbox_zen","drive":"F","category":"development-projects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"my-fastapi-app","path":"F:\\development\\development-projects\\my-fastapi-app","drive":"F","category":"development-projects","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-20","uncommitted":null,"fileCount":6,"topExtensions":"","hasReadme":null},{"name":"open-deep-research","path":"F:\\development\\development-projects\\open-deep-research","drive":"F","category":"development-projects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-08-15","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-08-15","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"self-hosted-ai-starter-kit","path":"F:\\development\\development-projects\\self-hosted-ai-starter-kit","drive":"F","category":"development-projects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-02-09","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-02-09","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"self-hosted-ai-starter-kit2","path":"F:\\development\\development-projects\\self-hosted-ai-starter-kit2","drive":"F","category":"development-projects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-04-03","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-04-03","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"youtube-generator","path":"F:\\development\\development-projects\\youtube-generator","drive":"F","category":"development-projects","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"scripting-json","path":"F:\\development\\development-scripting\\scripting-json","drive":"F","category":"development-scripting","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-28","uncommitted":null,"fileCount":8,"topExtensions":"","hasReadme":null},{"name":"scripting-powershell","path":"F:\\development\\development-scripting\\scripting-powershell","drive":"F","category":"development-scripting","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-06-08","uncommitted":null,"fileCount":16,"topExtensions":"","hasReadme":null},{"name":"scripting-python","path":"F:\\development\\development-scripting\\scripting-python","drive":"F","category":"development-scripting","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-28","uncommitted":null,"fileCount":23,"topExtensions":"","hasReadme":null},{"name":"homebrew","path":"F:\\development\\development-software-and-tools\\homebrew","drive":"F","category":"development-software-and-tools","hasGit":true,"branch":"stable","totalCommits":0,"lastCommitDate":"2026-04-15","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2026-04-15","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"cyber_warfare_group","path":"F:\\development\\development-webpages\\cyber_warfare_group","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"cyber-command-center","path":"F:\\development\\development-webpages\\cyber-command-center","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"deepsite_projects","path":"F:\\development\\development-webpages\\deepsite_projects","drive":"F","category":"development-webpages","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-03-13","uncommitted":null,"fileCount":3,"topExtensions":"","hasReadme":null},{"name":"digital_architect","path":"F:\\development\\development-webpages\\digital_architect","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":1,"lastCommitDate":"2026-04-26","commits30d":0,"commits90d":1,"contributors":1,"lastModified":"2026-04-26","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"digital_CV","path":"F:\\development\\development-webpages\\digital_CV","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"digital_mandate","path":"F:\\development\\development-webpages\\digital_mandate","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"docu_core","path":"F:\\development\\development-webpages\\docu_core","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"gcp","path":"F:\\development\\development-webpages\\gcp","drive":"F","category":"development-webpages","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-19","uncommitted":null,"fileCount":9,"topExtensions":"","hasReadme":null},{"name":"gemini-created-webpages","path":"F:\\development\\development-webpages\\gemini-created-webpages","drive":"F","category":"development-webpages","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-02","uncommitted":null,"fileCount":3,"topExtensions":"","hasReadme":null},{"name":"hapi_interactive_manual","path":"F:\\development\\development-webpages\\hapi_interactive_manual","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"huggingface_spaces","path":"F:\\development\\development-webpages\\huggingface_spaces","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"nullsector","path":"F:\\development\\development-webpages\\nullsector","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"omega_secure","path":"F:\\development\\development-webpages\\omega_secure","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"rag_chat","path":"F:\\development\\development-webpages\\rag_chat","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"rootweb3.0","path":"F:\\development\\development-webpages\\rootweb3.0","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"social_spark","path":"F:\\development\\development-webpages\\social_spark","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"stormcommando","path":"F:\\development\\development-webpages\\stormcommando","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"technomad","path":"F:\\development\\development-webpages\\technomad","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"terminal_chat","path":"F:\\development\\development-webpages\\terminal_chat","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"the_modern_survival_,manual","path":"F:\\development\\development-webpages\\the_modern_survival_,manual","drive":"F","category":"development-webpages","hasGit":true,"branch":"main","totalCommits":0,"lastCommitDate":"2025-09-16","commits30d":0,"commits90d":0,"contributors":1,"lastModified":"2025-09-16","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"dotfiles","path":"F:\\development\\dotfiles","drive":"F","category":"development","hasGit":true,"branch":"main","totalCommits":1,"lastCommitDate":"2026-07-04","commits30d":1,"commits90d":1,"contributors":1,"lastModified":"2026-07-04","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"git-credential-manager","path":"F:\\development\\git-credential-manager","drive":"F","category":"development","hasGit":false,"branch":null,"totalCommits":0,"lastCommitDate":null,"commits30d":0,"commits90d":0,"contributors":null,"lastModified":"2026-05-20","uncommitted":null,"fileCount":0,"topExtensions":"","hasReadme":null},{"name":"stoic-journal","path":"F:\\development\\projects\\stoic-journal","drive":"F","category":"projects","hasGit":true,"branch":"autoresearch/mvp-environment-test","totalCommits":3,"lastCommitDate":"2026-07-05","commits30d":3,"commits90d":3,"contributors":2,"lastModified":"2026-07-05","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"template-android-app","path":"F:\\development\\template-android-app","drive":"F","category":"development","hasGit":true,"branch":"main","totalCommits":1,"lastCommitDate":"2026-07-04","commits30d":1,"commits90d":1,"contributors":1,"lastModified":"2026-07-04","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null},{"name":"template-compose-stack","path":"F:\\development\\template-compose-stack","drive":"F","category":"development","hasGit":true,"branch":"main","totalCommits":1,"lastCommitDate":"2026-07-04","commits30d":1,"commits90d":1,"contributors":1,"lastModified":"2026-07-04","uncommitted":null,"fileCount":null,"topExtensions":"","hasReadme":null}]</script>
+<script>
+const RAW = JSON.parse(document.getElementById('scan-data').textContent);
+const TODAY = new Date('2026-07-10');
+
+// ---------- tech detection ----------
+function tech(p) {
+  const e = (p.topExtensions || ''), n = p.name.toLowerCase(), c = (p.category || '').toLowerCase();
+  if (e.includes('.kt') || c.includes('android') || n.includes('android') || n.includes('compose')) return 'Android/Kotlin';
+  if (e.includes('.dart') || n === 'flutter') return 'Flutter/Dart';
+  if (e.includes('.py') || n.includes('python') || n.includes('fastapi') || n.includes('fast-api')) return 'Python';
+  if (e.includes('.ps1') || n.includes('powershell')) return 'PowerShell';
+  if (e.includes('.tsx') || e.includes('.ts')) return 'TypeScript';
+  if (e.includes('.jsx') || e.includes('.js')) return 'JavaScript';
+  if (e.includes('.cs') || n.includes('webview2')) return 'C#/.NET';
+  if (c.includes('webpages') || e.includes('.html') || e.includes('.css')) return 'Web/HTML';
+  if (e.includes('.go')) return 'Go'; if (e.includes('.rs')) return 'Rust';
+  if (n.includes('notes') || n.includes('wiki') || n.includes('json') || e.includes('.md')) return 'Docs/Notes';
+  if (n === 'dotfiles' || n.includes('credential') || n === 'homebrew') return 'Tooling/Config';
+  return 'Other';
+}
+function daysSince(d) { if (!d) return 9999; return Math.max(0, Math.round((TODAY - new Date(d)) / 864e5)); }
+
+// ---------- health scoring (adapted from kickoff doc 04 for repo telemetry) ----------
+// Components: Activity 40% · Momentum 25% · Hygiene 20% · Maturity 15%
+function lerp(x, pts) { // pts: [[x,score],...] descending score
+  if (x <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    if (x <= pts[i][0]) { const [x0,y0]=pts[i-1],[x1,y1]=pts[i]; return y0+(y1-y0)*(x-x0)/(x1-x0); }
+  }
+  return pts[pts.length-1][1];
+}
+function health(p) {
+  const reasons = [];
+  const age = daysSince(p.lastActivity);
+  // Activity: days since last commit/edit
+  const A = lerp(age, [[7,100],[30,75],[90,45],[180,20],[365,0]]);
+  if (age <= 7) reasons.push({t:'pos', m:`Active in the last week (${age}d ago)`});
+  else if (age > 90) reasons.push({t:'warn', m:`No activity for ${age} days`});
+  // Momentum: 30d commits vs expected from 90d pace
+  let M = null;
+  if (p.hasGit && p.commits90d > 0) {
+    const ratio = p.commits30d / (p.commits90d / 3);
+    M = lerp(-ratio, [[-2,100],[-1,85],[-0.5,55],[-0.15,25],[0,0]]);
+    if (ratio >= 1.2) reasons.push({t:'pos', m:`Momentum up: ${p.commits30d} commits in 30d`});
+    if (ratio < 0.4 && p.commits90d >= 6) reasons.push({t:'warn', m:`Velocity dropped ${Math.round((1-ratio)*100)}% vs 90-day pace`});
+  } else if (p.hasGit && p.totalCommits > 0) { M = 10; }
+  // Hygiene: git presence (+ uncommitted/readme when known)
+  let H = 100;
+  if (!p.hasGit) { H = 25; reasons.push({t:'warn', m:'No version control (no git repo)'}); }
+  else {
+    if (p.uncommitted != null && p.uncommitted > 0) { H -= Math.min(60, p.uncommitted * 3); reasons.push({t:'warn', m:`${p.uncommitted} uncommitted change${p.uncommitted>1?'s':''}`}); }
+    if (p.hasReadme === false) { H -= 15; reasons.push({t:'warn', m:'No README'}); }
+  }
+  H = Math.max(0, H);
+  // Maturity: substance of the project
+  const Mat = Math.min(100, (p.hasGit ? Math.min(60, (p.totalCommits||0) * 2) : 20) + Math.min(40, (p.fileCount||0) / 5));
+  const comps = [[A,.40],[M,.25],[H,.20],[Mat,.15]].filter(c => c[0] !== null);
+  const wsum = comps.reduce((s,c) => s + c[1], 0);
+  const score = Math.round(comps.reduce((s,c) => s + c[0]*c[1], 0) / wsum);
+  const label = score >= 85 ? 'Healthy' : score >= 70 ? 'Watch' : score >= 50 ? 'At Risk' : 'Dormant';
+  if (p.hasGit && p.uncommitted === 0 && age <= 30) reasons.push({t:'pos', m:'Clean working tree'});
+  return { score, label, reasons };
+}
+
+// ---------- prep ----------
+const projects = RAW.map(p => {
+  const lastActivity = [p.lastModified, p.lastCommitDate].filter(Boolean).sort().pop() || null;
+  const base = { ...p, lastActivity, tech: tech(p),
+    commits30d: p.commits30d||0, commits90d: p.commits90d||0, totalCommits: p.totalCommits||0,
+    uncommitted: p.uncommitted ?? null, fileCount: p.fileCount ?? null };
+  return { ...base, ...health(base) };
+});
+
+// ---------- stats ----------
+const active30 = projects.filter(p => daysSince(p.lastActivity) <= 30).length;
+const dormant = projects.filter(p => p.label === 'Dormant').length;
+const freshClones = projects.filter(p => p.hasGit && p.totalCommits === 0).length;
+const noGit = projects.filter(p => !p.hasGit).length;
+const c30 = projects.reduce((s,p) => s + p.commits30d, 0);
+document.getElementById('stats').innerHTML = [
+  ['', projects.length, 'Total projects'],
+  ['green', active30, 'Active last 30d'],
+  ['green', c30, 'Commits last 30d'],
+  ['amber', freshClones, 'Cloned, no local commits'],
+  ['orange', noGit, 'Without git'],
+  ['red', dormant, 'Dormant'],
+].map(([c,v,l]) => `<div class="stat ${c}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+document.getElementById('scanInfo').textContent = `${projects.length} projects · D:\\ and F:\\development · scanned 2026-07-10`;
+
+// ---------- filters ----------
+const sels = { fDrive: [...new Set(projects.map(p=>p.drive))].sort(), fCategory: [...new Set(projects.map(p=>p.category))].sort(), fTech: [...new Set(projects.map(p=>p.tech))].sort() };
+for (const [id, vals] of Object.entries(sels)) { const el = document.getElementById(id); vals.forEach(v => el.add(new Option(id==='fDrive' ? v + ':\\' : v, v))); }
+let state = { q:'', drive:'', cat:'', tech:'', health:'', sort:'score-asc' };
+function filtered() {
+  let out = projects.filter(p =>
+    (!state.q || p.name.toLowerCase().includes(state.q) || p.path.toLowerCase().includes(state.q)) &&
+    (!state.drive || p.drive === state.drive) && (!state.cat || p.category === state.cat) &&
+    (!state.tech || p.tech === state.tech) && (!state.health || p.label === state.health));
+  const s = state.sort;
+  out.sort((a,b) => s==='score-asc' ? a.score-b.score : s==='score-desc' ? b.score-a.score
+    : s==='recent' ? (b.lastActivity||'').localeCompare(a.lastActivity||'')
+    : s==='commits' ? b.commits30d-a.commits30d : a.name.localeCompare(b.name));
+  return out;
+}
+
+// ---------- render ----------
+const badgeCls = { 'Healthy':'b-healthy','Watch':'b-watch','At Risk':'b-atrisk','Dormant':'b-dormant' };
+const barCol = { 'Healthy':'var(--green)','Watch':'var(--amber)','At Risk':'var(--orange)','Dormant':'var(--red)' };
+function render() {
+  const list = filtered();
+  document.getElementById('gridTitle').textContent = `Projects (${list.length})`;
+  document.getElementById('grid').innerHTML = list.length ? list.map((p,i) => `
+    <div class="card" onclick="this.classList.toggle('open')">
+      <div class="top"><span class="name" title="${p.path}">${p.name}</span>
+        <span class="badge ${badgeCls[p.label]}">${p.score} · ${p.label}</span></div>
+      <div class="meta">${p.path}</div>
+      <div class="bar"><i style="width:${p.score}%;background:${barCol[p.label]}"></i></div>
+      <div class="kvs">
+        <span>⚙ <b>${p.tech}</b></span>
+        <span>⏱ <b>${p.lastActivity || '—'}</b></span>
+        ${p.hasGit ? `<span>⎇ <b>${p.branch||'?'}</b></span><span>✎ <b>${p.commits30d}</b>/30d</span>` : '<span>no git</span>'}
+      </div>
+      <div class="reasons">${p.reasons.map(r => `<div class="${r.t}">${r.t==='pos'?'✓':'⚠'} ${r.m}</div>`).join('') || 'No notable flags.'}
+        <div style="margin-top:6px">Local commits: ${p.totalCommits} · Contributors: ${p.contributors ?? '—'}${p.fileCount != null ? ' · Root files: ' + p.fileCount : ''}</div>
+      </div>
+    </div>`).join('') : '<div class="empty">No projects match the current filters.</div>';
+  document.querySelector('#table tbody').innerHTML = list.map(p => `
+    <tr><td title="${p.path}">${p.name}</td><td>${p.category}</td><td>${p.tech}</td>
+    <td class="num score" style="color:${barCol[p.label]}">${p.score}</td>
+    <td class="num">${p.commits30d}</td><td class="num">${p.totalCommits}</td>
+    <td class="num">${p.contributors ?? '—'}</td><td>${p.branch || '—'}</td><td>${p.lastActivity||'—'}</td></tr>`).join('');
+}
+document.getElementById('search').oninput = e => { state.q = e.target.value.toLowerCase(); render(); };
+document.getElementById('fDrive').onchange = e => { state.drive = e.target.value; render(); };
+document.getElementById('fCategory').onchange = e => { state.cat = e.target.value; render(); };
+document.getElementById('fTech').onchange = e => { state.tech = e.target.value; render(); };
+document.getElementById('fHealth').onchange = e => { state.health = e.target.value; render(); };
+document.getElementById('fSort').onchange = e => { state.sort = e.target.value; render(); };
+render();
+
+// ---------- charts ----------
+Chart.defaults.color = '#8b949e'; Chart.defaults.borderColor = '#30363d';
+const top15 = [...projects].sort((a,b) => b.commits30d - a.commits30d).slice(0,15).filter(p => p.commits30d > 0);
+new Chart(document.getElementById('cActivity'), { type: 'bar',
+  data: { labels: top15.map(p=>p.name), datasets: [{ label: 'commits 30d', data: top15.map(p=>p.commits30d), backgroundColor: '#58a6ff' }] },
+  options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { maxRotation: 60, minRotation: 45, font: { size: 10 } } } } } });
+const hl = ['Healthy','Watch','At Risk','Dormant'];
+new Chart(document.getElementById('cHealth'), { type: 'doughnut',
+  data: { labels: hl, datasets: [{ data: hl.map(l => projects.filter(p=>p.label===l).length), backgroundColor: ['#3fb950','#d29922','#f0883e','#f85149'], borderColor: '#161b22' }] },
+  options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } } });
+const techCounts = {}; projects.forEach(p => techCounts[p.tech] = (techCounts[p.tech]||0)+1);
+const te = Object.entries(techCounts).sort((a,b)=>b[1]-a[1]);
+new Chart(document.getElementById('cTech'), { type: 'bar',
+  data: { labels: te.map(e=>e[0]), datasets: [{ data: te.map(e=>e[1]), backgroundColor: '#bc8cff' }] },
+  options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 10 } } } } } });
+
+document.getElementById('footer').textContent = 'Health score = 40% activity recency + 25% commit momentum + 20% repo hygiene + 15% maturity · commit metrics from local git reflogs (local activity only) · click a card for the why · built by Claude for Vibe Coders';
+</script>
+</body>
+</html>
