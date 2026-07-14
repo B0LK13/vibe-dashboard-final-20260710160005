@@ -1,0 +1,7 @@
+# Ephemeral run artifacts from scan.ps1 / run-scan.ps1 — regenerated on every scan,
+# not meant to be tracked. scan-data.json IS tracked (it's the merged output that
+# index.html's coverage-patch logic and any downstream tooling read as a snapshot).
+scan-parts/
+scan-progress.txt
+scan-done.txt
+*.bak
