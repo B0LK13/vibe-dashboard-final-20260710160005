@@ -29,8 +29,9 @@ disclaimer at the top of the master backlog for what that does and doesn't cover
 | `scan.ps1` | v2 scanner: collects git telemetry per project into `scan-parts\*.json`. |
 | `run-scan.ps1` | One-command refresh: batched scan (`-NoProfile`) + merge. |
 | `merge-data.ps1` | Combines part files into `scan-data.json`, snapshots the previous version into `snapshots\`, and injects both data + a merge timestamp into `index.html`. |
-| `backlog\` | Generated backlog: `MASTER_BACKLOG.md`, `tasks.json`, and one `<project-slug>.md` per scanned project. |
+| `backlog\` | Generated backlog: `MASTER_BACKLOG.md`, `tasks.json`, `FINDINGS_AND_RECOMMENDATIONS.md`, one `<project-slug>.md` per scanned project, and `autonomous-loop-runs\` for per-project readiness reports. |
 | `commit-backlog.ps1` | Phase-by-phase local committer for the backlog's "uncommitted changes" tasks. |
+| `run-autonomous-loop-backlog.ps1` | Phase-by-phase local runner that points `autonomous-loop` at each backlog project for a deeper, code-level readiness pass. |
 | `reflogs\` | Raw reflog exports from the original v1 scan. |
 
 This folder is git-tracked (`origin` on GitHub) — rollback is `git checkout -- <file>` or
@@ -149,6 +150,20 @@ this `project-dashboard` folder mounted.
   session's folder mount at all (directories listed fine, individual files like `README.md`
   came back "does not exist"). Added `commit-backlog.ps1` to do this locally instead, phase by
   phase, with a stale-lock safety check.
+
+- **2026-07-14 (findings report + autonomous-loop integration, Claude)** — wrote
+  `backlog/FINDINGS_AND_RECOMMENDATIONS.md`, synthesizing everything above into a prioritized
+  "do first / do next / do when there's time" list, plus a live proof-of-concept run of
+  `D:\autonomous-loop` (a separate tool already in the portfolio) against `vibe-dashboard`
+  itself: analysis-only, no changes made, real result of **0.537 — BLOCKED** (no automated
+  tests, 5 missing MVP elements) — report under `backlog/autonomous-loop-runs/vibe-dashboard/`.
+  Added `run-autonomous-loop-backlog.ps1`, mirroring `commit-backlog.ps1`'s phase-by-priority
+  pattern, so the same readiness pass can be run locally across the rest of the backlog
+  (defaults to `-Strategy analysis-only`; `-Strategy full` applies small, git-checkpointed,
+  auto-reverting improvements once you're ready to trust it further). This session's own file
+  access is too limited to run it against most of the 126 projects directly (see the
+  `sharepoint-automation` note above) — this is a local-execution tool by design, same as
+  `commit-backlog.ps1`.
 
 ## Known limits / next iteration
 
