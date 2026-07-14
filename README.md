@@ -11,6 +11,16 @@ gone dormant. No backend, no database: `scan.ps1` walks the filesystem and git h
 Health score = 40% activity recency + 25% commit momentum + 20% repo hygiene + 15% maturity.
 Click a card to see the "why" behind its score.
 
+## Backlog
+
+[`backlog/MASTER_BACKLOG.md`](backlog/MASTER_BACKLOG.md) is a portfolio-wide backlog covering all 126
+scanned projects — 290 tasks generated from scan telemetry (git hygiene, dormancy, README presence,
+tech-stack recommendations), plus cross-cutting findings (duplicate project names, near-identical
+scaffold clusters, vendor clones, stale scan-list entries). Each project also has its own
+`backlog/<project-slug>.md` with full detail, and the whole thing is queryable as data in
+[`backlog/tasks.json`](backlog/tasks.json). It's telemetry-based, not a source-code review — see the
+disclaimer at the top of the master backlog for what that does and doesn't cover.
+
 ## Files
 
 | File | Purpose |
@@ -19,6 +29,7 @@ Click a card to see the "why" behind its score.
 | `scan.ps1` | v2 scanner: collects git telemetry per project into `scan-parts\*.json`. |
 | `run-scan.ps1` | One-command refresh: batched scan (`-NoProfile`) + merge. |
 | `merge-data.ps1` | Combines part files into `scan-data.json`, snapshots the previous version into `snapshots\`, and injects both data + a merge timestamp into `index.html`. |
+| `backlog\` | Generated backlog: `MASTER_BACKLOG.md`, `tasks.json`, and one `<project-slug>.md` per scanned project. |
 | `reflogs\` | Raw reflog exports from the original v1 scan. |
 
 This folder is git-tracked (`origin` on GitHub) — rollback is `git checkout -- <file>` or
@@ -104,6 +115,14 @@ this `project-dashboard` folder mounted.
   `scan-parts\`, so the "fixed" scanner never actually re-ran against them. Restored the
   correct data from git and re-deployed. Added the warning above so this doesn't repeat.
 
+- **2026-07-14 (portfolio backlog, Claude)** — generated `backlog/` from `scan-data.json`
+  telemetry: 290 tasks across all 126 projects (git hygiene, dormancy, README gaps, tech-stack
+  recommendations, vendor/missing handling), a `MASTER_BACKLOG.md` with cross-cutting findings
+  (35 projects with no git at all, 7 duplicate project names across paths, a 16-project
+  near-identical scaffold cluster under `development-webpages`, etc.), and a machine-readable
+  `tasks.json`. Explicitly telemetry-based — this tool has no file access to the other 125
+  repos, so there's no source-code review behind these tasks, only git/filesystem signals.
+
 ## Known limits / next iteration
 
 - `project-llm-wiki`'s 2026-07-14 scan entry is missing `topExtensions`/`lastModified`/
@@ -117,3 +136,6 @@ this `project-dashboard` folder mounted.
 - Take the lesson from the category bug: don't trust an assumption about `Split-Path`
   (or any PowerShell cmdlet) edge-case behavior without testing it against a real drive-root
   path — code review alone missed it, a real run caught it immediately.
+- `backlog/` is a point-in-time snapshot generated from one scan — it doesn't auto-regenerate
+  on `run-scan.ps1`. Re-run the generator script after future rescans if you want the backlog
+  to reflect fresh telemetry (script isn't wired into the refresh pipeline yet).
