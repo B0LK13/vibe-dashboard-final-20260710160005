@@ -13,4 +13,10 @@ $batch = 15
 # silently stops scanning early if the project list grows without this number being updated too.
 for ($s = 0; $s -lt 200; $s += $batch) {
   try {
-    powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scan.ps1') -Start $s -End ($s + $batch -
+    powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scan.ps1') -Start $s -End ($s + $batch - 1)
+  } catch { "BATCH $s FAILED: $_" | Out-File (Join-Path $root 'scan-progress.txt') -Append -Encoding utf8 }
+}
+
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'merge-data.ps1')
+'ALL_DONE ' + (Get-Date -Format s) | Out-File (Join-Path $root 'scan-done.txt') -Encoding utf8
+Write-Output 'Scan + merge complete. Open index.html to view the refreshed dashboard.'

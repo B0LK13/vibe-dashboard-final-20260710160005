@@ -5,7 +5,7 @@
 #   2. each project writes its own JSON part file immediately -> crash-safe + resumable
 # Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File scan.ps1 [-Start n] [-End n] [-Force]
 # Re-runs skip projects that already have a part file unless -Force is given.
-# Rollback: scan.ps1.bak is the previous version.
+# Rollback: git checkout -- scan.ps1 (this repo is git-tracked; .bak files were retired 2026-07-14).
 param([int]$Start = 0, [int]$End = 9999, [switch]$Force)
 
 $root = 'D:\project-dashboard\vibe-dashboard'
@@ -40,6 +40,12 @@ $projects = @(
 
 $codeExt = '^\.(ts|tsx|js|jsx|py|kt|java|cs|go|rs|dart|html|css|md|ps1|sh|json|yml|yaml|php|vue|svelte)$'
 
+# [System.IO.Path]::GetExtension() throws on filenames with characters Windows considers
+# illegal in a path (seen for real on project-llm-wiki: 'Illegal characters in path' killed
+# the whole try block, silently dropping fileCount/topExtensions/lastModified/hasReadme for
+# that project). Regex-based extraction never throws — worst case it just returns ''.
+function Get-ExtSafe { param([string]$Name) if ($Name -match '(\.[A-Za-z0-9]+)$') { $Matches[1] } else { '' } }
+
 function Invoke-GitTimeout {
   param([string]$Repo, [string]$GitArgs, [int]$TimeoutSec = 15)
   try {
@@ -69,9 +75,13 @@ for ($i = $Start; $i -le [Math]::Min($End, $projects.Count - 1); $i++) {
   "$(Get-Date -Format HH:mm:ss) [$i] $p" | Out-File $progress -Append -Encoding utf8
 
   $parentLeaf = Split-Path (Split-Path $p -Parent) -Leaf
-  # drive-root projects (e.g. D:\ai-fintech) have no meaningful parent leaf ('') —
-  # fall back to the "<Drive>-root" convention used everywhere else (EXTRAS list, docs)
-  $category = if ([string]::IsNullOrEmpty($parentLeaf)) { "$($p.Substring(0,1))-root" } else { $parentLeaf }
+  # drive-root projects (e.g. D:\ai-fintech): Split-Path -Leaf on a bare drive root
+  # ('D:\') returns the root itself ('D:\'), NOT an empty string as you'd expect —
+  # first attempt at this fix assumed empty-string and missed real drive-root paths
+  # entirely (confirmed against a real scan: category came out as literal "D:\").
+  # Match that case explicitly and fall back to the "<Drive>-root" convention used
+  # everywhere else (EXTRAS list, docs).
+  $category = if ($parentLeaf -match '^[A-Za-z]:\\?$') { "$($p.Substring(0,1))-root" } else { $parentLeaf }
   $obj = [ordered]@{ name = (Split-Path $p -Leaf); path = $p; drive = $p.Substring(0,1); category = $category }
   try {
     if (-not (Test-Path $p)) { $obj.missing = $true; $obj.hasGit = $false }
@@ -94,7 +104,7 @@ for ($i = $Start; $i -le [Math]::Min($End, $projects.Count - 1); $i++) {
         if ($null -ne $tracked) {
           $files = @($tracked -split "`n" | Where-Object { $_ })
           $obj.fileCount = $files.Count
-          $extGroups = $files | ForEach-Object { [System.IO.Path]::GetExtension($_) } | Where-Object { $_ -match $codeExt } | Group-Object | Sort-Object Count -Descending | Select-Object -First 3
+          $extGroups = $files | ForEach-Object { Get-ExtSafe $_ } | Where-Object { $_ -match $codeExt } | Group-Object | Sort-Object Count -Descending | Select-Object -First 3
           $obj.topExtensions = ($extGroups | ForEach-Object { "$($_.Name):$($_.Count)" }) -join ','
         } else { $obj.fileCount = $null; $obj.topExtensions = '' }
         $obj.lastModified = $obj.lastCommitDate
@@ -102,4 +112,12 @@ for ($i = $Start; $i -le [Math]::Min($End, $projects.Count - 1); $i++) {
         $files = Get-ChildItem -Path $p -Recurse -Depth 2 -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch 'node_modules|\.venv|__pycache__|build\\|dist\\' } | Select-Object -First 800
         $obj.fileCount = @($files).Count
         $obj.lastModified = if ($obj.fileCount -gt 0) { ($files | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime.ToString('yyyy-MM-dd') } else { $null }
-        $extGroups = $files | Group-Object Extension | Where-Object { $_.Name -match $codeExt } | Sort-Object Count -Descending | Selec
+        $extGroups = $files | Group-Object Extension | Where-Object { $_.Name -match $codeExt } | Sort-Object Count -Descending | Select-Object -First 3
+        $obj.topExtensions = ($extGroups | ForEach-Object { "$($_.Name):$($_.Count)" }) -join ','
+      }
+      $obj.hasReadme = [bool](Get-ChildItem -Path $p -Filter 'README*' -ErrorAction SilentlyContinue | Select-Object -First 1)
+    }
+  } catch { $obj.error = "$_" }
+  [pscustomobject]$obj | ConvertTo-Json -Depth 3 | Out-File $part -Encoding utf8
+}
+Write-Output "BATCH $Start-$End done. Parts in scan-parts\ ($((Get-ChildItem $partsDir -Filter *.json).Count)/$($projects.Count))"

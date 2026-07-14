@@ -25,4 +25,17 @@ $json | Out-File $dataPath -Encoding utf8
 # 2. inject into dashboard (MatchEvaluator avoids $-substitution issues inside JSON)
 $htmlPath = Join-Path $root 'index.html'
 $html = Get-Content $htmlPath -Raw -Encoding utf8
-$pattern = '(?s)(<scri
+$pattern = '(?s)(<script id="scan-data" type="application/json">).*?(</script>)'
+$evaluator = { param($m) $m.Groups[1].Value + $json + $m.Groups[2].Value }.GetNewClosure()
+$new = [regex]::Replace($html, $pattern, $evaluator)
+if ($new -eq $html) { Write-Warning 'scan-data block not found or unchanged in index.html' }
+
+# 3. stamp the merge timestamp + project count so index.html can render a live scanInfo line
+# instead of hand-typed dates that go stale (see SCAN_META block near the top of the <script>)
+$metaJson = "{`"mergedAt`":`"$mergedAt`",`"count`":$($all.Count)}"
+$metaPattern = '(?s)(<script id="scan-meta" type="application/json">).*?(</script>)'
+$metaEvaluator = { param($m) $m.Groups[1].Value + $metaJson + $m.Groups[2].Value }.GetNewClosure()
+$new = [regex]::Replace($new, $metaPattern, $metaEvaluator)
+Set-Content $htmlPath -Value $new -Encoding utf8 -NoNewline
+
+Write-Output "Merged $($all.Count) projects into scan-data.json and index.html (snapshot saved, meta stamped $mergedAt)"
