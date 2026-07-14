@@ -28,6 +28,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\project-dashboard\vibe-da
 Resumable: a crashed run continues where it stopped (part files are kept). Full rescan:
 delete `scan-parts\` first, or pass `-Force` to `scan.ps1`.
 
+**After changing `scan.ps1` itself, always delete `scan-parts\` (or pass `-Force`) before the
+next run.** Per-project part files are skipped if they already exist — re-running without
+clearing them just re-merges the *old* output under a new timestamp, silently discarding
+whatever the fix was supposed to change (bit us for real on 2026-07-14, see History below).
+
 **Important — this only works on the machine being scanned.** `scan.ps1`'s project list
 covers paths on `C:\`, `D:\`, `E:\` and `F:\`; it has to run with a real Windows PowerShell +
 git against those drives. It cannot be run from a sandboxed/remote environment that only has
@@ -83,6 +88,14 @@ this `project-dashboard` folder mounted.
   - Now that real data covers all 126 projects, the coverage-patch block in `index.html`
     (`README_TRUE`/`README_FALSE`/`EXTRAS`) was confirmed redundant — every `EXTRAS` path
     already exists in the real scan — and deleted.
+
+- **2026-07-14 (redeploy gotcha, Claude)** — a re-run of `run-scan.ps1` right after the fixes
+  above silently re-merged the *old* buggy `scan-parts\*.json` files, clobbering the fixed
+  `scan-data.json`/`index.html` with the pre-fix category strings and the `project-llm-wiki`
+  error again. Root cause: `scan.ps1` skips any project that already has a part file unless
+  `-Force` is passed — the part files from the very first buggy run were still sitting in
+  `scan-parts\`, so the "fixed" scanner never actually re-ran against them. Restored the
+  correct data from git and re-deployed. Added the warning above so this doesn't repeat.
 
 ## Known limits / next iteration
 
