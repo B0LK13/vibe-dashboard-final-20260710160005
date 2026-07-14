@@ -1,8 +1,15 @@
 # Vibe Dashboard — Project Performance Dashboard
 
-Single-file dashboard (`index.html`, open directly in a browser) showing the health of every
-first-party project across C:, D:, E: and F:. Health score = 40% activity recency +
-25% commit momentum + 20% repo hygiene + 15% maturity. Click a card to see the "why".
+A single-file, static dashboard that scans every first-party git repo across your local
+drives and scores each one on activity, momentum, hygiene, and maturity — so you can see at a
+glance which of your ~126 side projects are alive, which are stalling, and which have quietly
+gone dormant. No backend, no database: `scan.ps1` walks the filesystem and git history, and
+`index.html` renders the result as sortable/filterable cards, a table, and a few charts.
+
+**🔴 Live:** https://b0lk13.github.io/vibe-dashboard-final-20260710160005/
+
+Health score = 40% activity recency + 25% commit momentum + 20% repo hygiene + 15% maturity.
+Click a card to see the "why" behind its score.
 
 ## Files
 
