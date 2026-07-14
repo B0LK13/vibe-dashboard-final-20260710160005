@@ -30,6 +30,7 @@ disclaimer at the top of the master backlog for what that does and doesn't cover
 | `run-scan.ps1` | One-command refresh: batched scan (`-NoProfile`) + merge. |
 | `merge-data.ps1` | Combines part files into `scan-data.json`, snapshots the previous version into `snapshots\`, and injects both data + a merge timestamp into `index.html`. |
 | `backlog\` | Generated backlog: `MASTER_BACKLOG.md`, `tasks.json`, and one `<project-slug>.md` per scanned project. |
+| `commit-backlog.ps1` | Phase-by-phase local committer for the backlog's "uncommitted changes" tasks. |
 | `reflogs\` | Raw reflog exports from the original v1 scan. |
 
 This folder is git-tracked (`origin` on GitHub) — rollback is `git checkout -- <file>` or
@@ -123,6 +124,32 @@ this `project-dashboard` folder mounted.
   `tasks.json`. Explicitly telemetry-based — this tool has no file access to the other 125
   repos, so there's no source-code review behind these tasks, only git/filesystem signals.
 
+- **2026-07-14 (scan contamination bug, Claude)** — attempting to act on the backlog's top
+  "Critical: commit N pending changes" items surfaced a real scanner bug: `development-agents`,
+  `AI-shell`, `sharepoint-automation`, and `mda-cli-v2` — four unrelated projects, not adjacent
+  in the project list, split across two different batch runs — all reported byte-identical
+  git stats (`branch`, `totalCommits`, `lastCommitDate`, `commits30d`/`90d`, `uncommitted`,
+  `contributors`) while their filesystem-derived fields (`fileCount`, `hasReadme`) correctly
+  differed. Live investigation found `development-agents` and `mda-cli-v2` have `.git` folders
+  that exist but are completely empty (no `HEAD`, no objects, no refs) — so `totalCommits: 10`
+  for them was fabricated, not just stale. Root cause not confirmed (suspect
+  `Invoke-GitTimeout`'s unawaited `ReadToEndAsync()` under load, or something in how failed/
+  timed-out calls fall through) — but two defenses are now in place regardless of cause:
+  `scan.ps1` requires `.git\HEAD` to actually exist before trusting `hasGit`, and tracks every
+  git fingerprint seen in a run, nulling out and flagging (`suspiciousGitDataReused`) any exact
+  repeat instead of silently writing it to the part file; `merge-data.ps1` also warns on any
+  duplicate fingerprint across all merged parts, in case an old contaminated part file is still
+  sitting in `scan-parts\`. The 4 affected part files were deleted so the next scan (without
+  `-Force`, since only theirs are missing) redoes just them with real data. Two of the five
+  "Critical" backlog items (`powerplatform-cli-wrapper`, and `sharepoint-automation` once
+  rescanned) were confirmed real; the other three were this bug and are not real backlog items.
+  Neither could actually be committed from this session, though, for two separate reasons:
+  `powerplatform-cli-wrapper` has a stale (or genuinely active — couldn't tell from here)
+  `.git\index.lock`; `sharepoint-automation`'s root-level files weren't reachable through the
+  session's folder mount at all (directories listed fine, individual files like `README.md`
+  came back "does not exist"). Added `commit-backlog.ps1` to do this locally instead, phase by
+  phase, with a stale-lock safety check.
+
 ## Known limits / next iteration
 
 - `project-llm-wiki`'s 2026-07-14 scan entry is missing `topExtensions`/`lastModified`/
@@ -139,3 +166,11 @@ this `project-dashboard` folder mounted.
 - `backlog/` is a point-in-time snapshot generated from one scan — it doesn't auto-regenerate
   on `run-scan.ps1`. Re-run the generator script after future rescans if you want the backlog
   to reflect fresh telemetry (script isn't wired into the refresh pipeline yet).
+- `development-agents`, `AI-shell`, `sharepoint-automation`, `mda-cli-v2` need a plain rescan
+  (`run-scan.ps1`, no `-Force` needed — only their 4 part files were deleted) to get real data
+  after the scan-contamination bug above; until then they're simply missing from `scan-data.json`
+  rather than wrong.
+- The scan-contamination root cause itself is still unconfirmed — the fingerprint-dedup defense
+  in `scan.ps1`/`merge-data.ps1` catches the symptom, not the cause. If `suspiciousGitDataReused`
+  or a merge warning shows up again, that's a live repro worth actually debugging (add
+  `Write-Verbose` around `Invoke-GitTimeout`'s process handling).

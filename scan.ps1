@@ -86,7 +86,11 @@ for ($i = $Start; $i -le [Math]::Min($End, $projects.Count - 1); $i++) {
   try {
     if (-not (Test-Path $p)) { $obj.missing = $true; $obj.hasGit = $false }
     else {
-      $isGit = Test-Path (Join-Path $p '.git')
+      # 2026-07-14: Test-Path '.git' alone isn't enough -- seen for real on development-agents
+      # and mda-cli-v2, whose .git dirs exist but are completely empty (no HEAD/objects/refs),
+      # yet still reported hasGit:true with fabricated-looking commit stats. Require HEAD to
+      # actually exist before trusting anything git-derived.
+      $isGit = (Test-Path (Join-Path $p '.git')) -and (Test-Path (Join-Path $p '.git\HEAD'))
       $obj.hasGit = $isGit
       if ($isGit) {
         $obj.branch         = Invoke-GitTimeout $p 'rev-parse --abbrev-ref HEAD'
@@ -100,6 +104,27 @@ for ($i = $Start; $i -le [Math]::Min($End, $projects.Count - 1); $i++) {
         # undercounts contributors on any repo with >200 commits in its history)
         $v = Invoke-GitTimeout $p 'log --all --pretty=%an' 30
         $obj.contributors   = if ($v) { @($v -split "`n" | Where-Object { $_ } | Sort-Object -Unique).Count } else { $null }
+
+        # 2026-07-14: found 4 unrelated projects (development-agents, AI-shell,
+        # sharepoint-automation, mda-cli-v2), NOT adjacent in $projects and split across two
+        # different batch/process runs, with byte-identical git-derived stats
+        # (branch/totalCommits/dates/uncommitted/contributors) while their filesystem-derived
+        # fields correctly differed -- root cause not confirmed (possibly Invoke-GitTimeout's
+        # unawaited ReadToEndAsync racing under load, or something in how failed/timed-out
+        # calls fall through), but this catches the *symptom* regardless of cause: track every
+        # git fingerprint seen so far in this run, and if the current project's exactly repeats
+        # an earlier one, don't trust it -- null the fields out and flag for a rescan instead of
+        # silently propagating a copy into scan-data.json.
+        if (-not $script:seenGitFingerprints) { $script:seenGitFingerprints = @{} }
+        $fingerprint = "$($obj.branch)|$($obj.totalCommits)|$($obj.lastCommitDate)|$($obj.commits30d)|$($obj.commits90d)|$($obj.uncommitted)|$($obj.contributors)"
+        if ($script:seenGitFingerprints.ContainsKey($fingerprint)) {
+          $obj.suspiciousGitDataReused = $true
+          $obj.suspiciousGitDataDupeOf = $script:seenGitFingerprints[$fingerprint]
+          $obj.branch = $null; $obj.totalCommits = $null; $obj.lastCommitDate = $null
+          $obj.commits30d = $null; $obj.commits90d = $null; $obj.uncommitted = $null; $obj.contributors = $null
+        } else {
+          $script:seenGitFingerprints[$fingerprint] = $p
+        }
         $tracked = Invoke-GitTimeout $p 'ls-files' 30
         if ($null -ne $tracked) {
           $files = @($tracked -split "`n" | Where-Object { $_ })

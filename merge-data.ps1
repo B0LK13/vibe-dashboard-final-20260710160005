@@ -7,6 +7,24 @@ $parts = Get-ChildItem $partsDir -Filter *.json -ErrorAction Stop | Sort-Object 
 if (-not $parts) { throw "No part files in $partsDir - run scan.ps1 first." }
 
 $all = foreach ($f in $parts) { Get-Content $f.FullName -Raw -Encoding utf8 | ConvertFrom-Json }
+
+# 2026-07-14: cross-project duplicate-stats detector. scan.ps1 now self-flags this within a
+# single run (suspiciousGitDataReused), but this catches it across runs/batches too -- e.g. if
+# an older part file from before that fix is still sitting in scan-parts\. Any two DIFFERENT
+# projects sharing the exact same non-null (branch, totalCommits, lastCommitDate, uncommitted,
+# contributors) tuple is not a coincidence; it's scan contamination (seen for real: development-
+# agents, AI-shell, sharepoint-automation, mda-cli-v2 all reported identically).
+$seen = @{}
+foreach ($proj in $all) {
+  if (-not $proj.hasGit -or $null -eq $proj.totalCommits) { continue }
+  $fp = "$($proj.branch)|$($proj.totalCommits)|$($proj.lastCommitDate)|$($proj.uncommitted)|$($proj.contributors)"
+  if ($seen.ContainsKey($fp)) {
+    Write-Warning "SUSPICIOUS: '$($proj.name)' ($($proj.path)) has identical git stats to '$($seen[$fp])' -- likely scan contamination, not a coincidence. Delete both part files in scan-parts\ and rescan with -Force."
+  } else {
+    $seen[$fp] = "$($proj.name) ($($proj.path))"
+  }
+}
+
 $json = ConvertTo-Json @($all) -Depth 4 -Compress
 $mergedAt = Get-Date -Format 's'
 
